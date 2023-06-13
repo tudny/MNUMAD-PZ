@@ -5,3 +5,4 @@ jupyter
 jupyter-server==1.23.6
 jupyter-client==7.3.2
 tornado==6.2
+unittest2==1.1

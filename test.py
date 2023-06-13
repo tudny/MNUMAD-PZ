@@ -1,19 +1,17 @@
 import numpy as np
-from divide_and_conquer_svd import divide_and_conquer_svd
+from divide_and_conquer_svd import divide_and_conquer_svd, _householder_from_k, _reduce_to_bidiagonal_form
 
 A = np.array([
-    [1, 2, 3],
-    [4, 5, 6],
-    [7, 8, 9],
-    [10, 11, 12]
-])
+    [1,  2, 3,  4, 5],
+    [21, 3, 4,  5, 6],
+    [3, 44, 5,  6, 7],
+    [41, 5, 6,  7, 8],
+    [5,  6, 77, 8, 9],
+], dtype=float)
 
-U, S, Vt = divide_and_conquer_svd(A)
+u, s, v = divide_and_conquer_svd(A)
+print(u)
+print(s)
+print(v)
 
-# print the result
-print("U = ", U)
-print("S = ", S)
-print("Vt = ", Vt)
-
-# check the result
-print("A = ", U @ S @ Vt)
+print(np.allclose(A, u @ s @ v))
