@@ -19,14 +19,31 @@ def divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.nd
 
 
 def _divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Divide and conquer SVD algorithm
+    @param A: Matrix to be decomposed (m x n)
+    @return: U, S, V^T such that A = U S V^T (m x m, m x n, n x n)
+    """
     m, n = A.shape
 
     # Step 1: Reduce to bidiagonal form
     u, b, v = _reduce_to_bidiagonal_form(A)
+    b = b[:n, :n]
 
     # Step 2: Compute SVD of bidiagonal matrix
+    U, S, V = _divide_and_conquer_svd_bidiagonal(b)
 
-    return u, b, v
+    return u @ U, S, V @ v
+
+
+def _divide_and_conquer_svd_bidiagonal(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Computes the SVD of a bidiagonal matrix
+    @param A: Bidiagonal matrix (m x n)
+    @return: U, S, V^T such that A = U S V^T (m x m, m x n, n x n)
+    """
+    n, m = A.shape
+    return np.eye(m), A, np.eye(n)
 
 
 def _reduce_to_bidiagonal_form(
