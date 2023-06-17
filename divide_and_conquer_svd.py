@@ -7,7 +7,7 @@ def sliding_window(collection, window_size):
     if len(collection) < window_size:
         return
     for i in range(len(collection) - window_size + 1):
-        yield collection[i:i + window_size]
+        yield collection[i: i + window_size]
 
 
 def divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -43,7 +43,9 @@ def _divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.n
     return u @ U, S, V @ v
 
 
-def _divide_and_conquer_svd_bidiagonal(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _divide_and_conquer_svd_bidiagonal(
+        A: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Computes the SVD of a bidiagonal matrix
     @param A: Bidiagonal matrix (m x n)
@@ -118,10 +120,11 @@ def _householder_from(x: np.ndarray) -> np.ndarray:
 # ======================================= Finding zeros ============================================
 # ==================================================================================================
 
+
 class LambdaFunction:
     def __init__(self, z: np.ndarray, d: np.ndarray):
         """
-        Represents a function of the form f(x) = 1 + \sigma_i^N z_i^2 / (d_i - x)
+        Represents a function of the form $f(x) = 1 + \sum_i^N z_i^2 / (d_i - x)$
         @param z: Parameter vector (N)
         @param d: Parameter vector (N)
         """
@@ -154,7 +157,7 @@ def _find_zero_in(f: LambdaFunction, a: float, b: float, tol: float = 1e-6) -> f
     """
     assert a < b, "a must be less than b"
 
-    f_a = -1
+    f_a = -1  # We only care about the sign of f(a)
     c = (a + b) / 2
     while abs(f(c)) > tol:
         if f_a * f(c) < 0:
@@ -196,6 +199,69 @@ def _find_all_zeros(f: LambdaFunction, tol: float = 1e-6) -> np.ndarray:
         zeros.append(zero_i)
     zeros.append(_find_zero_after(f, f.d[-1], tol))
     return np.array(zeros)
+
+
+def _find_eigenvalue_of_d_z_matrix(
+        d: np.ndarray, z: np.ndarray, tol: float = 1e-6
+) -> np.ndarray:
+    """
+    Finds the eigenvalues of the matrix D - Z^T Z
+    @param d: Parameter vector (N)
+    @param z: Parameter vector (N)
+    @param tol: Tolerance for finding zeros
+    @return: Eigenvalues of D - Z^T Z
+    """
+    f = LambdaFunction(z, d)
+    zeros = _find_all_zeros(f, tol)
+    return zeros
+
+
+def _find_kth_eigenvector_of_d_z_matrix(
+        d: np.ndarray, z: np.ndarray, kth_eigenvalue: float, tol: float = 1e-6
+) -> np.ndarray:
+    """
+    Finds the kth eigenvector of the matrix D + z^T z
+    @param d: parameter vector (N)
+    @param z: parameter vector (N)
+    @param kth_eigenvalue: kth eigenvalue of D + z^T z
+    @param tol: Tolerance for finding eigenvectors
+    @return: kth eigenvector of D + z^T z
+    """
+    m_rev = np.array([1 / (d_i - kth_eigenvalue) for d_i in d])
+    return z * m_rev
+
+
+def _find_eigenvectors_of_d_z_matrix(
+        d: np.ndarray, z: np.ndarray, eigenvalues: np.ndarray, tol: float = 1e-6
+) -> list[np.ndarray]:
+    """
+    Finds the eigenvectors of the matrix D + z^T z
+    @param d: Parameter vector (N)
+    @param z: Parameter vector (N)
+    @param eigenvalues: Eigenvalues of D + z^T z
+    @param tol: Tolerance for finding eigenvectors
+    @return: Eigenvectors of D + z^T z
+    """
+    eigenvectors = []
+    for eigenvalue in eigenvalues:
+        eigenvector = _find_kth_eigenvector_of_d_z_matrix(d, z, eigenvalue, tol)
+        eigenvectors.append(eigenvector)
+    return eigenvectors
+
+
+def find_eignepairs_of_d_z_matrix(
+        d: np.ndarray, z: np.ndarray, tol: float = 1e-6
+) -> tuple[np.ndarray, list[np.ndarray]]:
+    """
+    Finds the eigenvalues and eigenvectors of the matrix D + z^T z
+    @param d: Parameter vector (N)
+    @param z: Parameter vector (N)
+    @param tol: Tolerance for finding eigenvalues and eigenvectors
+    @return: Eigenvalues and eigenvectors of D + z^T z
+    """
+    eigenvalues = _find_eigenvalue_of_d_z_matrix(d, z, tol)
+    eigenvectors = _find_eigenvectors_of_d_z_matrix(d, z, eigenvalues, tol)
+    return eigenvalues, eigenvectors
 
 
 # ==================================================================================================
@@ -242,26 +308,32 @@ class HouseholderFromKTest(unittest.TestCase):
 
 class ReduceToBidiagonalFormTest(unittest.TestCase):
     def test_reduce_to_bidiagonal_form_1(self):
-        A = np.array([
-            [1, 2, 3],
-            [4, 5, 6],
-            [7, 8, 9],
-            [10, 11, 12],
-        ], dtype=float)
+        A = np.array(
+            [
+                [1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9],
+                [10, 11, 12],
+            ],
+            dtype=float,
+        )
         u, b, v = _reduce_to_bidiagonal_form(A)
         self.assertTrue(np.allclose(A, u @ b @ v))
         self.assertTrue(np.allclose(u.T @ u, np.eye(4)))
         self.assertTrue(np.allclose(v.T @ v, np.eye(3)))
 
     def test_reduce_to_bidiagonal_form_2(self):
-        A = np.array([
-            [1, 2, 3, 4, 5],
-            [4, 5, 6, 7, 8],
-            [7, 8, 9, 10, 11],
-            [10, 11, 12, 13, 14],
-            [13, 14, 15, 16, 17],
-            [16, 17, 18, 19, 20],
-        ], dtype=float)
+        A = np.array(
+            [
+                [1, 2, 3, 4, 5],
+                [4, 5, 6, 7, 8],
+                [7, 8, 9, 10, 11],
+                [10, 11, 12, 13, 14],
+                [13, 14, 15, 16, 17],
+                [16, 17, 18, 19, 20],
+            ],
+            dtype=float,
+        )
         u, b, v = _reduce_to_bidiagonal_form(A)
         self.assertTrue(np.allclose(A, u @ b @ v))
         self.assertTrue(np.allclose(u.T @ u, np.eye(6)))
