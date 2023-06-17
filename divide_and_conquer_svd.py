@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+from scipy.linalg import block_diag
 
 
 def sliding_window(collection, window_size):
@@ -19,7 +20,10 @@ def divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.nd
     @return: U, S, V^T such that A = U S V^T (m x m, m x n, n x n)
     """
     m, n = A.shape
-    assert m >= n, "Matrix must have more rows than columns"
+    if m < n:
+        u, s, vt = divide_and_conquer_svd(A.T)
+        return vt.T, s, u.T
+
     u, s, vt = _divide_and_conquer_svd(A)
     assert np.allclose(A, u @ s @ vt), "Decomposition is incorrect"
     return u, s, vt
@@ -32,27 +36,106 @@ def _divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.n
     @return: U, S, V^T such that A = U S V^T (m x m, m x n, n x n)
     """
     m, n = A.shape
+    if n > m:
+        u, s, v = _divide_and_conquer_svd(A.T)
+        return u.T, s, v.T
 
     # Step 1: Reduce to bidiagonal form
     u, b, v = _reduce_to_bidiagonal_form(A)
-    b = b[:n, :n]
+    b = b[:n, :n]  # Remove extra rows and columns with zeros
 
     # Step 2: Compute SVD of bidiagonal matrix
     U, S, V = _divide_and_conquer_svd_bidiagonal(b)
+    U = block_diag(U, np.eye(m - n))
 
     return u @ U, S, V @ v
 
 
+def _row_switching_matrix(i: int, j: int, n: int) -> np.ndarray:
+    """
+    Constructs a matrix that switches rows i and j
+    @param i: row index
+    @param j: row index
+    @return: Matrix that switches rows i and j
+    """
+    assert i != j, "Rows must be different"
+    assert 0 <= i < n, "Row index out of bounds"
+    assert 0 <= j < n, "Row index out of bounds"
+
+    row_switching_matrix = np.eye(n)
+    row_switching_matrix[i, i] = 0
+    row_switching_matrix[j, j] = 0
+    row_switching_matrix[i, j] = 1
+    row_switching_matrix[j, i] = 1
+
+    return row_switching_matrix
+
+
+def _full_eigen_problem_d_zzt(C_dash: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    D = C_dash.copy()
+    D[0, :] = 0
+    zT = D[0, :]
+    z = zT.T.reshape(-1, 1)
+    d = []
+    for i in range(1, D.shape[0]):
+        d.append(D[i, i])
+        d[-1] *= d[-1]
+    d = np.array(d).reshape(-1, 1)
+
+    eigenvalues, eigenvectors = find_eignepairs_of_d_z_matrix(d, z)
+    Y = np.ndarray(eigenvectors)
+    S = np.diag(eigenvalues)
+
+    return Y, S
+
+
 def _divide_and_conquer_svd_bidiagonal(
-        A: np.ndarray,
+        B: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Computes the SVD of a bidiagonal matrix
-    @param A: Bidiagonal matrix (m x n)
+    @param B: Bidiagonal matrix (m x n)
     @return: U, S, V^T such that A = U S V^T (m x m, m x n, n x n)
     """
-    n, m = A.shape
-    return np.eye(m), A, np.eye(n)
+    m, n = B.shape
+    if n > m:
+        u, s, v = _divide_and_conquer_svd_bidiagonal(B.T)
+        return v.T, s, u.T
+
+    if n == 1:
+        return np.eye(m), B, np.eye(n)
+
+    # Decompose B
+    k = n // 2
+    B_1 = B[:k, :k + 1]
+    B_2 = B[k + 1:, k + 1:]
+    q_k = B[k, k]
+    r_k = B[k, k + 1]
+
+    U_1, D_1, V_1T = _divide_and_conquer_svd(B_1)
+    D_1 = D_1[:, :-1]  # Remove last column of D_1
+    U_2, D_2, V_2T = _divide_and_conquer_svd(B_2)
+
+    U_dash = block_diag(U_1, np.eye(1), U_2)
+    V_dashT = block_diag(V_1T, V_2T)
+
+    P_k = _row_switching_matrix(1, k, n)
+
+    lambda_1 = V_1T[-1, -1]
+    l_1T = V_1T[-1, :-1]
+    f_2T = V_2T[0, 1:]
+
+    C_dash = block_diag(np.eye(1), D_1, D_2)
+    C_dash[0, :] = np.array(
+        [lambda_1 * q_k] +
+        q_k * l_1T +
+        r_k * f_2T
+    )
+
+    Y, S = _full_eigen_problem_d_zzt(C_dash)
+    X = C_dash @ Y @ S ** (-1)
+
+    return U_dash @ P_k @ X, S, Y.T @ P_k.T @ V_dashT
 
 
 def _reduce_to_bidiagonal_form(
@@ -91,13 +174,7 @@ def _householder_from_k(x: np.ndarray, k: int) -> np.ndarray:
     """
     upper_left_identity = np.eye(k - 1)
     lower_right_householder = _householder_from(x[k - 1:])
-    n = len(x)
-    return np.block(
-        [
-            [upper_left_identity, np.zeros((k - 1, n - k + 1))],
-            [np.zeros((n - k + 1, k - 1)), lower_right_householder],
-        ]
-    )
+    return block_diag(upper_left_identity, lower_right_householder)
 
 
 def _householder_from(x: np.ndarray) -> np.ndarray:
