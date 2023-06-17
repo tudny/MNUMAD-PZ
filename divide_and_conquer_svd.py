@@ -3,6 +3,13 @@ import unittest
 import numpy as np
 
 
+def sliding_window(collection, window_size):
+    if len(collection) < window_size:
+        return
+    for i in range(len(collection) - window_size + 1):
+        yield collection[i:i + window_size]
+
+
 def divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Divide and conquer SVD algorithm
@@ -108,6 +115,90 @@ def _householder_from(x: np.ndarray) -> np.ndarray:
 
 
 # ==================================================================================================
+# ======================================= Finding zeros ============================================
+# ==================================================================================================
+
+class LambdaFunction:
+    def __init__(self, z: np.ndarray, d: np.ndarray):
+        """
+        Represents a function of the form f(x) = 1 + \sigma_i^N z_i^2 / (d_i - x)
+        @param z: Parameter vector (N)
+        @param d: Parameter vector (N)
+        """
+        self.z = z
+        self.d = d
+        # Assert z and d and one-dimensional vectors
+        assert len(z.shape) == 1, "z must be a vector"
+        assert len(d.shape) == 1, "d must be a vector"
+        # Assert z and d have the same length
+        assert len(z) == len(d), "z and d must have the same length"
+
+    def __call__(self, *args, **kwargs):
+        """
+        Evaluates the function at x
+        @param x: Value to evaluate function at
+        @return: f(x)
+        """
+        x = args[0]
+        return 1 + np.sum(self.z ** 2 / (self.d - x))
+
+
+def _find_zero_in(f: LambdaFunction, a: float, b: float, tol: float = 1e-6) -> float:
+    """
+    Finds a zero of the function f in the interval [a, b]
+    @param f: Function to find zero of
+    @param a: Left endpoint of interval
+    @param b: Right endpoint of interval
+    @param tol: Tolerance for finding zero
+    @return: Zero of f in [a, b]
+    """
+    assert a < b, "a must be less than b"
+
+    f_a = -1
+    c = (a + b) / 2
+    while abs(f(c)) > tol:
+        if f_a * f(c) < 0:
+            b = c
+        else:
+            a = c
+        c = (a + b) / 2
+    return c
+
+
+def _find_zero_after(f: LambdaFunction, a: float, tol: float = 1e-6) -> float:
+    """
+    Finds a zero of the function f after the point a
+    @param f: Function to find zero of
+    @param a: Point after which to find zero
+    @param tol: Tolerance for finding zero
+    @return: Zero of f after a
+    """
+    value_at_a = -1
+    maybe_b = a + 1
+    step = 1
+    while f(maybe_b) * value_at_a > 0:
+        maybe_b += step
+        step *= 2
+    return _find_zero_in(f, a, maybe_b, tol)
+
+
+def _find_all_zeros(f: LambdaFunction, tol: float = 1e-6) -> np.ndarray:
+    """
+    Finds all zeros of the function f. There are N zeros.
+    N-1 are between d_i and d_{i+1} and the last one is after d_N.
+    @param f: Function to find zeros of
+    @param tol: Tolerance for finding zeros
+    @return: Vector of all zeros of f
+    """
+    zeros = []
+    for d_i, d_i1 in sliding_window(f.d, 2):
+        zero_i = _find_zero_in(f, d_i, d_i1, tol)
+        zeros.append(zero_i)
+    zeros.append(_find_zero_after(f, f.d[-1], tol))
+    return np.array(zeros)
+
+
+# ==================================================================================================
 # ========================================= Unit Tests =============================================
 # ==================================================================================================
 
@@ -182,4 +273,3 @@ class ReduceToBidiagonalFormTest(unittest.TestCase):
         self.assertTrue(np.allclose(A, u @ b @ v))
         self.assertTrue(np.allclose(u.T @ u, np.eye(10)))
         self.assertTrue(np.allclose(v.T @ v, np.eye(10)))
-
