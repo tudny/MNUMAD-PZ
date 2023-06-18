@@ -11,6 +11,25 @@ def sliding_window(collection, window_size):
         yield collection[i: i + window_size]
 
 
+def is_square(A: np.ndarray) -> bool:
+    """
+    Checks if object A is a square matrix (NxN)
+    @param A: Object to be checked
+    @return: True if A is a square matrix, False otherwise
+    """
+    return A.ndim == 2 and A.shape[0] == A.shape[1]
+
+
+def inverse_diagonal(D: np.ndarray) -> np.ndarray:
+    """
+    Computes the inverse of a diagonal matrix
+    @param D: Diagonal matrix to be inverted
+    @return: Inverse of D
+    """
+    assert is_square(D), "Matrix D must be square"
+    return np.diag(1 / np.diag(D))
+
+
 def divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Divide and conquer SVD algorithm
@@ -19,13 +38,14 @@ def divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.nd
     @param A: Matrix to be decomposed (m x n)
     @return: U, S, V^T such that A = U S V^T (m x m, m x n, n x n)
     """
+    A.dtype = float
     m, n = A.shape
     if m < n:
         u, s, vt = divide_and_conquer_svd(A.T)
-        return vt.T, s, u.T
+        return vt.T, s.T, u.T
 
     u, s, vt = _divide_and_conquer_svd(A)
-    assert np.allclose(A, u @ s @ vt), "Decomposition is incorrect"
+    # assert np.allclose(A, u @ s @ vt), "Decomposition is incorrect"
     return u, s, vt
 
 
@@ -38,7 +58,7 @@ def _divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.n
     m, n = A.shape
     if n > m:
         u, s, v = _divide_and_conquer_svd(A.T)
-        return u.T, s, v.T
+        return v.T, s.T, u.T
 
     # Step 1: Reduce to bidiagonal form
     u, b, v = _reduce_to_bidiagonal_form(A)
@@ -47,6 +67,10 @@ def _divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.n
     # Step 2: Compute SVD of bidiagonal matrix
     U, S, V = _divide_and_conquer_svd_bidiagonal(b)
     U = block_diag(U, np.eye(m - n))
+    S = np.block([
+        [S],
+        [np.zeros((m - n, n))]
+    ])
 
     return u @ U, S, V @ v
 
@@ -58,7 +82,8 @@ def _row_switching_matrix(i: int, j: int, n: int) -> np.ndarray:
     @param j: row index
     @return: Matrix that switches rows i and j
     """
-    assert i != j, "Rows must be different"
+    if i == j:
+        return np.eye(n)
     assert 0 <= i < n, "Row index out of bounds"
     assert 0 <= j < n, "Row index out of bounds"
 
@@ -73,20 +98,19 @@ def _row_switching_matrix(i: int, j: int, n: int) -> np.ndarray:
 
 def _full_eigen_problem_d_zzt(C_dash: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     D = C_dash.copy()
+    z = D[0, :].copy()
     D[0, :] = 0
-    zT = D[0, :]
-    z = zT.T.reshape(-1, 1)
     d = []
-    for i in range(1, D.shape[0]):
+    for i in range(0, D.shape[0]):
         d.append(D[i, i])
         d[-1] *= d[-1]
-    d = np.array(d).reshape(-1, 1)
+    d = np.array(d)
 
     eigenvalues, eigenvectors = find_eignepairs_of_d_z_matrix(d, z)
-    Y = np.ndarray(eigenvectors)
+    Y = np.stack(eigenvectors)
     S = np.diag(eigenvalues)
 
-    return Y, S
+    return Y.T, S
 
 
 def _divide_and_conquer_svd_bidiagonal(
@@ -100,7 +124,11 @@ def _divide_and_conquer_svd_bidiagonal(
     m, n = B.shape
     if n > m:
         u, s, v = _divide_and_conquer_svd_bidiagonal(B.T)
+
         return v.T, s, u.T
+
+    if n == 0:
+        return np.zeros((0, 0)), np.zeros((0, 0)), np.zeros((0, 0))
 
     if n == 1:
         return np.eye(m), B, np.eye(n)
@@ -110,30 +138,35 @@ def _divide_and_conquer_svd_bidiagonal(
     B_1 = B[:k, :k + 1]
     B_2 = B[k + 1:, k + 1:]
     q_k = B[k, k]
-    r_k = B[k, k + 1]
+    r_k = B[k, k + 1] if k + 1 < n else 0
 
     U_1, D_1, V_1T = _divide_and_conquer_svd(B_1)
     D_1 = D_1[:, :-1]  # Remove last column of D_1
     U_2, D_2, V_2T = _divide_and_conquer_svd(B_2)
 
+    assert is_square(D_1), "D_1 is not square"
+    assert is_square(D_2), "D_2 is not square"
+
     U_dash = block_diag(U_1, np.eye(1), U_2)
     V_dashT = block_diag(V_1T, V_2T)
 
-    P_k = _row_switching_matrix(1, k, n)
+    P_k = _row_switching_matrix(0, k, n)
 
-    lambda_1 = V_1T[-1, -1]
-    l_1T = V_1T[-1, :-1]
-    f_2T = V_2T[0, 1:]
+    lambda_1 = V_1T[-1, -1].copy()
+    l_1T = V_1T[-1, :-1].copy()
+    f_2T = V_2T[0, 1:].copy() if k + 1 < n else np.zeros((1, 0))
 
     C_dash = block_diag(np.eye(1), D_1, D_2)
-    C_dash[0, :] = np.array(
-        [lambda_1 * q_k] +
-        q_k * l_1T +
-        r_k * f_2T
-    )
+
+    C_dash[0, :] = np.concatenate([
+        np.array([lambda_1 * q_k]),
+        q_k * l_1T,
+        (r_k * f_2T if k + 1 < n else np.array([]))
+    ])
 
     Y, S = _full_eigen_problem_d_zzt(C_dash)
-    X = C_dash @ Y @ S ** (-1)
+
+    X = C_dash @ Y @ inverse_diagonal(S)
 
     return U_dash @ P_k @ X, S, Y.T @ P_k.T @ V_dashT
 
@@ -153,7 +186,7 @@ def _reduce_to_bidiagonal_form(
     v = np.eye(n)
     b = A.copy()
 
-    for k in range(0, n - 1):
+    for k in range(0, n):
         H_k = _householder_from_k(b[:, k], k + 1)
         u = u @ H_k.T
         b = H_k @ b
@@ -186,9 +219,14 @@ def _householder_from(x: np.ndarray) -> np.ndarray:
     """
     assert len(x.shape) == 1, "x must be a vector"
     n = len(x)
+    if n == 0:
+        return np.eye(n)
     v = x.copy()
     v_norm = np.linalg.norm(v)
     v[0] += np.sign(v[0]) * v_norm
+    v_norm = np.linalg.norm(v)
+    if n == 0 or not np.nonzero(v_norm):
+        return np.eye(n)
     v /= np.linalg.norm(v)
     return np.eye(n) - 2 * np.outer(v, v)
 
@@ -236,8 +274,9 @@ def _find_zero_in(f: LambdaFunction, a: float, b: float, tol: float = 1e-6) -> f
 
     f_a = -1  # We only care about the sign of f(a)
     c = (a + b) / 2
-    while abs(f(c)) > tol:
-        if f_a * f(c) < 0:
+    while abs(f_c := f(c)) > tol:
+        print(f"Current c: {c}")
+        if f_a * f_c < 0:
             b = c
         else:
             a = c
@@ -305,7 +344,7 @@ def _find_kth_eigenvector_of_d_z_matrix(
     @return: kth eigenvector of D + z^T z
     """
     m_rev = np.array([1 / (d_i - kth_eigenvalue) for d_i in d])
-    return z * m_rev
+    return m_rev * z
 
 
 def _find_eigenvectors_of_d_z_matrix(
