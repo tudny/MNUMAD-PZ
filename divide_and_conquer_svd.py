@@ -8,7 +8,7 @@ def sliding_window(collection, window_size):
     if len(collection) < window_size:
         return
     for i in range(len(collection) - window_size + 1):
-        yield collection[i : i + window_size]
+        yield collection[i: i + window_size]
 
 
 def is_square(A: np.ndarray) -> bool:
@@ -30,26 +30,27 @@ def inverse_diagonal(D: np.ndarray) -> np.ndarray:
     return np.diag(1 / np.diag(D))
 
 
-def divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def divide_and_conquer_svd(A: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Divide and conquer SVD algorithm
     Decomposes a matrix A into U, S, V^T such that A = U S V^T
     Matrix U is orthogonal, matrix S is diagonal, and matrix V is orthogonal
     @param A: Matrix to be decomposed (m x n)
+    @param tol: Tolerance for singular values
     @return: U, S, V^T such that A = U S V^T (m x m, m x n, n x n)
     """
     A.dtype = float
     m, n = A.shape
     if m < n:
-        u, s, vt = divide_and_conquer_svd(A.T)
+        u, s, vt = divide_and_conquer_svd(A.T, tol=tol)
         return vt.T, s.T, u.T
 
-    u, s, vt = _divide_and_conquer_svd(A)
+    u, s, vt = _divide_and_conquer_svd(A, tol=tol)
     # assert np.allclose(A, u @ s @ vt), "Decomposition is incorrect"
     return u, s, vt
 
 
-def _divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _divide_and_conquer_svd(A: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Divide and conquer SVD algorithm
     @param A: Matrix to be decomposed (m x n)
@@ -65,7 +66,7 @@ def _divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.n
     b = b[:n, :n]  # Remove extra rows and columns with zeros
 
     # Step 2: Compute SVD of bidiagonal matrix
-    U, S, V = _divide_and_conquer_svd_bidiagonal(b)
+    U, S, V = _divide_and_conquer_svd_bidiagonal(b, tol=tol)
     U = block_diag(U, np.eye(m - n))
     S = np.block([[S], [np.zeros((m - n, n))]])
 
@@ -93,7 +94,7 @@ def _row_switching_matrix(i: int, j: int, n: int) -> np.ndarray:
     return row_switching_matrix
 
 
-def _full_eigen_problem_d_zzt(C_dash: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _full_eigen_problem_d_zzt(C_dash: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, np.ndarray]:
     """
     Computes the eigenvalues and eigenvectors of the matrix D + Z Z^T
     @param C_dash: Matrix D + Z Z^T (n x n)
@@ -104,7 +105,7 @@ def _full_eigen_problem_d_zzt(C_dash: np.ndarray) -> tuple[np.ndarray, np.ndarra
     D[0, :] = 0
     d = D.diagonal().copy() ** 2
 
-    eigenvalues, eigenvectors = find_eignepairs_of_d_z_matrix(d, z)
+    eigenvalues, eigenvectors = find_eignepairs_of_d_z_matrix(d, z, tol=tol)
     YT = np.stack(eigenvectors)
     S = np.diag(eigenvalues)
 
@@ -112,7 +113,8 @@ def _full_eigen_problem_d_zzt(C_dash: np.ndarray) -> tuple[np.ndarray, np.ndarra
 
 
 def _divide_and_conquer_svd_bidiagonal(
-    B: np.ndarray,
+        B: np.ndarray,
+        tol: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Computes the SVD of a bidiagonal matrix
@@ -121,7 +123,7 @@ def _divide_and_conquer_svd_bidiagonal(
     """
     m, n = B.shape
     if n > m:
-        u, s, v = _divide_and_conquer_svd_bidiagonal(B.T)
+        u, s, v = _divide_and_conquer_svd_bidiagonal(B.T, tol=tol)
 
         return v.T, s, u.T
 
@@ -134,13 +136,13 @@ def _divide_and_conquer_svd_bidiagonal(
     # Decompose B
     k = n // 2
     B_1 = B[:k, : k + 1]
-    B_2 = B[k + 1 :, k + 1 :]
+    B_2 = B[k + 1:, k + 1:]
     q_k = B[k, k]
     r_k = B[k, k + 1] if k + 1 < n else 0
 
-    U_1, D_1, V_1T = _divide_and_conquer_svd(B_1)
+    U_1, D_1, V_1T = _divide_and_conquer_svd(B_1, tol=tol)
     D_1 = D_1[:, :-1]  # Remove last column of D_1
-    U_2, D_2, V_2T = _divide_and_conquer_svd(B_2)
+    U_2, D_2, V_2T = _divide_and_conquer_svd(B_2, tol=tol)
 
     assert is_square(D_1), "D_1 is not square"
     assert is_square(D_2), "D_2 is not square"
@@ -154,7 +156,7 @@ def _divide_and_conquer_svd_bidiagonal(
     l_1T = V_1T.T[-1, :-1].copy()
     f_2T = V_2T.T[0, 0:].copy() if k + 1 < n else np.zeros((1, 0))
 
-    C_dash = block_diag(np.eye(1), D_1, D_2)
+    C_dash = block_diag(np.zeros((1, 1)), D_1, D_2)
 
     C_dash[0, :] = np.concatenate(
         [
@@ -164,15 +166,17 @@ def _divide_and_conquer_svd_bidiagonal(
         ]
     )
 
-    YT, S = _full_eigen_problem_d_zzt(C_dash)
+    YT, S = _full_eigen_problem_d_zzt(C_dash, tol=tol)
+    S = np.sqrt(S)
 
-    X = C_dash.T @ C_dash @ YT.T @ inverse_diagonal(S)
+    S_inv = inverse_diagonal(S)
+    X = C_dash @ YT.T @ S_inv
 
     return U_dash @ P_k @ X, S, YT @ P_k.T @ V_dashT
 
 
 def _reduce_to_bidiagonal_form(
-    A: np.ndarray,
+        A: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Reduces a matrix A to bidiagonal form using Householder reflections
@@ -206,7 +210,7 @@ def _householder_from_k(x: np.ndarray, k: int) -> np.ndarray:
     @return: Householder matrix H such that H @ x = [*, ..., *, 0, ..., 0]^T where there are k '*'
     """
     upper_left_identity = np.eye(k - 1)
-    lower_right_householder = _householder_from(x[k - 1 :])
+    lower_right_householder = _householder_from(x[k - 1:])
     return block_diag(upper_left_identity, lower_right_householder)
 
 
@@ -243,8 +247,10 @@ class LambdaFunction:
         @param z: Parameter vector (N)
         @param d: Parameter vector (N)
         """
-        self.z = z
-        self.d = d
+        d_z = zip(d, z)
+        d_z = sorted(d_z, key=lambda x: x[0])
+        self.z = np.array([x[1] for x in d_z])
+        self.d = np.array([x[0] for x in d_z])
         # Assert z and d and one-dimensional vectors
         assert len(z.shape) == 1, "z must be a vector"
         assert len(d.shape) == 1, "d must be a vector"
@@ -258,7 +264,7 @@ class LambdaFunction:
         @return: f(x)
         """
         x = args[0]
-        return 1 + np.sum(self.z**2 / (self.d - x))
+        return 1 + np.sum(self.z ** 2 / (self.d - x))
 
 
 def _find_zero_in(f: LambdaFunction, a: float, b: float, tol: float = 1e-6) -> float:
@@ -318,7 +324,7 @@ def _find_all_zeros(f: LambdaFunction, tol: float = 1e-6) -> np.ndarray:
 
 
 def _find_eigenvalue_of_d_z_matrix(
-    d: np.ndarray, z: np.ndarray, tol: float = 1e-6
+        d: np.ndarray, z: np.ndarray, tol: float = 1e-6
 ) -> np.ndarray:
     """
     Finds the eigenvalues of the matrix D - Z^T Z
@@ -333,7 +339,7 @@ def _find_eigenvalue_of_d_z_matrix(
 
 
 def _find_kth_eigenvector_of_d_z_matrix(
-    d: np.ndarray, z: np.ndarray, kth_eigenvalue: float, tol: float = 1e-6
+        d: np.ndarray, z: np.ndarray, kth_eigenvalue: float, tol: float = 1e-6
 ) -> np.ndarray:
     """
     Finds the kth eigenvector of the matrix D + z^T z
@@ -348,7 +354,7 @@ def _find_kth_eigenvector_of_d_z_matrix(
 
 
 def _find_eigenvectors_of_d_z_matrix(
-    d: np.ndarray, z: np.ndarray, eigenvalues: np.ndarray, tol: float = 1e-6
+        d: np.ndarray, z: np.ndarray, eigenvalues: np.ndarray, tol: float = 1e-6
 ) -> list[np.ndarray]:
     """
     Finds the eigenvectors of the matrix D + z^T z
@@ -368,7 +374,7 @@ def _find_eigenvectors_of_d_z_matrix(
 
 
 def find_eignepairs_of_d_z_matrix(
-    d: np.ndarray, z: np.ndarray, tol: float = 1e-6
+        d: np.ndarray, z: np.ndarray, tol: float = 1e-6
 ) -> tuple[np.ndarray, list[np.ndarray]]:
     """
     Finds the eigenvalues and eigenvectors of the matrix D + z^T z

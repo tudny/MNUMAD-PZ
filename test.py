@@ -107,13 +107,15 @@ from divide_and_conquer_svd import (
 
 A = np.array(
     [
-        [1.0, 2.0],
-        [0.0, 4.0],
+        [1.0, 2.0, 10.0],
+        [0.0, 4.0, 5.0],
+        [5.0, 6.0, 7.0],
+        [7.0, 8.0, 9.0],
     ],
     dtype=float,
 )
 
-u, s, v = divide_and_conquer_svd(A)
+u, s, v = divide_and_conquer_svd(A, 1e-10)
 print("A")
 print(A)
 
