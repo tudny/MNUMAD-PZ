@@ -105,6 +105,8 @@ def _full_eigen_problem_d_zzt(C_dash: np.ndarray, tol: float = 1e-6) -> tuple[np
     D[0, :] = 0
     d = D.diagonal().copy() ** 2
 
+    print('dd', d)
+
     eigenvalues, eigenvectors = find_eignepairs_of_d_z_matrix(d, z, tol=tol)
     YT = np.stack(eigenvectors)
     S = np.diag(eigenvalues)
@@ -165,6 +167,9 @@ def _divide_and_conquer_svd_bidiagonal(
             (r_k * f_2T if k + 1 < n else np.array([])),
         ]
     )
+
+    print('C_dash')
+    print(C_dash)
 
     YT, S = _full_eigen_problem_d_zzt(C_dash, tol=tol)
     S = np.sqrt(S)
@@ -231,7 +236,8 @@ def _householder_from(x: np.ndarray) -> np.ndarray:
     v_norm = np.linalg.norm(v)
     if n == 0 or not np.nonzero(v_norm):
         return np.eye(n)
-    v /= np.linalg.norm(v)
+    if (v_norm := np.linalg.norm(v)) != 0:
+        v /= v_norm
     return np.eye(n) - 2 * np.outer(v, v)
 
 
@@ -316,6 +322,7 @@ def _find_all_zeros(f: LambdaFunction, tol: float = 1e-6) -> np.ndarray:
     @return: Vector of all zeros of f
     """
     zeros = []
+    print('d', f.d)
     for d_i, d_i1 in sliding_window(f.d, 2):
         zero_i = _find_zero_in(f, d_i, d_i1, tol)
         zeros.append(zero_i)

@@ -115,7 +115,18 @@ A = np.array(
     dtype=float,
 )
 
-u, s, v = divide_and_conquer_svd(A, 1e-10)
+np.random.seed(42)
+
+A = np.array(
+    [
+        [x for x in range(y, y + 6)]
+        for y in range(1, 10)
+    ]
+)
+
+print(A)
+
+u, s, v = divide_and_conquer_svd(A, 1e-8)
 print("A")
 print(A)
 
@@ -128,3 +139,11 @@ print(v)
 
 print("combined")
 print(u @ s @ v)
+
+Ap = u @ s @ v
+print(A - Ap)
+print('norm', np.linalg.norm(A - Ap))
+
+eigenvalues = np.linalg.eigvals(A.T @ A)
+print('val', eigenvalues)
+print('s  ', s.T @ s)
