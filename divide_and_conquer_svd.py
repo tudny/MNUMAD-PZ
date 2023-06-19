@@ -8,7 +8,7 @@ def sliding_window(collection, window_size):
     if len(collection) < window_size:
         return
     for i in range(len(collection) - window_size + 1):
-        yield collection[i: i + window_size]
+        yield collection[i : i + window_size]
 
 
 def is_square(A: np.ndarray) -> bool:
@@ -67,10 +67,7 @@ def _divide_and_conquer_svd(A: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.n
     # Step 2: Compute SVD of bidiagonal matrix
     U, S, V = _divide_and_conquer_svd_bidiagonal(b)
     U = block_diag(U, np.eye(m - n))
-    S = np.block([
-        [S],
-        [np.zeros((m - n, n))]
-    ])
+    S = np.block([[S], [np.zeros((m - n, n))]])
 
     return u @ U, S, V @ v
 
@@ -97,14 +94,15 @@ def _row_switching_matrix(i: int, j: int, n: int) -> np.ndarray:
 
 
 def _full_eigen_problem_d_zzt(C_dash: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Computes the eigenvalues and eigenvectors of the matrix D + Z Z^T
+    @param C_dash: Matrix D + Z Z^T (n x n)
+    @return: Eigenvalues and eigenvectors of D + Z Z^T (S, V.T)
+    """
     D = C_dash.copy()
     z = D[0, :].copy()
     D[0, :] = 0
-    d = []
-    for i in range(0, D.shape[0]):
-        d.append(D[i, i])
-        d[-1] *= d[-1]
-    d = np.array(d)
+    d = D.diagonal().copy() ** 2
 
     eigenvalues, eigenvectors = find_eignepairs_of_d_z_matrix(d, z)
     YT = np.stack(eigenvectors)
@@ -114,7 +112,7 @@ def _full_eigen_problem_d_zzt(C_dash: np.ndarray) -> tuple[np.ndarray, np.ndarra
 
 
 def _divide_and_conquer_svd_bidiagonal(
-        B: np.ndarray,
+    B: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Computes the SVD of a bidiagonal matrix
@@ -135,8 +133,8 @@ def _divide_and_conquer_svd_bidiagonal(
 
     # Decompose B
     k = n // 2
-    B_1 = B[:k, :k + 1]
-    B_2 = B[k + 1:, k + 1:]
+    B_1 = B[:k, : k + 1]
+    B_2 = B[k + 1 :, k + 1 :]
     q_k = B[k, k]
     r_k = B[k, k + 1] if k + 1 < n else 0
 
@@ -158,11 +156,13 @@ def _divide_and_conquer_svd_bidiagonal(
 
     C_dash = block_diag(np.eye(1), D_1, D_2)
 
-    C_dash[0, :] = np.concatenate([
-        np.array([lambda_1 * q_k]),
-        q_k * l_1T,
-        (r_k * f_2T if k + 1 < n else np.array([]))
-    ])
+    C_dash[0, :] = np.concatenate(
+        [
+            np.array([lambda_1 * q_k]),
+            q_k * l_1T,
+            (r_k * f_2T if k + 1 < n else np.array([])),
+        ]
+    )
 
     YT, S = _full_eigen_problem_d_zzt(C_dash)
 
@@ -172,7 +172,7 @@ def _divide_and_conquer_svd_bidiagonal(
 
 
 def _reduce_to_bidiagonal_form(
-        A: np.ndarray,
+    A: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Reduces a matrix A to bidiagonal form using Householder reflections
@@ -206,7 +206,7 @@ def _householder_from_k(x: np.ndarray, k: int) -> np.ndarray:
     @return: Householder matrix H such that H @ x = [*, ..., *, 0, ..., 0]^T where there are k '*'
     """
     upper_left_identity = np.eye(k - 1)
-    lower_right_householder = _householder_from(x[k - 1:])
+    lower_right_householder = _householder_from(x[k - 1 :])
     return block_diag(upper_left_identity, lower_right_householder)
 
 
@@ -258,7 +258,7 @@ class LambdaFunction:
         @return: f(x)
         """
         x = args[0]
-        return 1 + np.sum(self.z ** 2 / (self.d - x))
+        return 1 + np.sum(self.z**2 / (self.d - x))
 
 
 def _find_zero_in(f: LambdaFunction, a: float, b: float, tol: float = 1e-6) -> float:
@@ -318,7 +318,7 @@ def _find_all_zeros(f: LambdaFunction, tol: float = 1e-6) -> np.ndarray:
 
 
 def _find_eigenvalue_of_d_z_matrix(
-        d: np.ndarray, z: np.ndarray, tol: float = 1e-6
+    d: np.ndarray, z: np.ndarray, tol: float = 1e-6
 ) -> np.ndarray:
     """
     Finds the eigenvalues of the matrix D - Z^T Z
@@ -333,7 +333,7 @@ def _find_eigenvalue_of_d_z_matrix(
 
 
 def _find_kth_eigenvector_of_d_z_matrix(
-        d: np.ndarray, z: np.ndarray, kth_eigenvalue: float, tol: float = 1e-6
+    d: np.ndarray, z: np.ndarray, kth_eigenvalue: float, tol: float = 1e-6
 ) -> np.ndarray:
     """
     Finds the kth eigenvector of the matrix D + z^T z
@@ -348,7 +348,7 @@ def _find_kth_eigenvector_of_d_z_matrix(
 
 
 def _find_eigenvectors_of_d_z_matrix(
-        d: np.ndarray, z: np.ndarray, eigenvalues: np.ndarray, tol: float = 1e-6
+    d: np.ndarray, z: np.ndarray, eigenvalues: np.ndarray, tol: float = 1e-6
 ) -> list[np.ndarray]:
     """
     Finds the eigenvectors of the matrix D + z^T z
@@ -366,7 +366,7 @@ def _find_eigenvectors_of_d_z_matrix(
 
 
 def find_eignepairs_of_d_z_matrix(
-        d: np.ndarray, z: np.ndarray, tol: float = 1e-6
+    d: np.ndarray, z: np.ndarray, tol: float = 1e-6
 ) -> tuple[np.ndarray, list[np.ndarray]]:
     """
     Finds the eigenvalues and eigenvectors of the matrix D + z^T z

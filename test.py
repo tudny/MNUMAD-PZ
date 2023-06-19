@@ -6,7 +6,7 @@ from divide_and_conquer_svd import (
     LambdaFunction,
     _find_all_zeros,
     find_eignepairs_of_d_z_matrix,
-    _divide_and_conquer_svd_bidiagonal
+    _divide_and_conquer_svd_bidiagonal,
 )
 
 #
@@ -107,22 +107,22 @@ from divide_and_conquer_svd import (
 
 A = np.array(
     [
-        [1., 2.],
-        [0., 4.],
+        [1.0, 2.0],
+        [0.0, 4.0],
     ],
     dtype=float,
 )
 
 u, s, v = divide_and_conquer_svd(A)
-print('A')
+print("A")
 print(A)
 
-print('u')
+print("u")
 print(u)
-print('s')
+print("s")
 print(s)
-print('v')
+print("v")
 print(v)
 
-print('combined')
+print("combined")
 print(u @ s @ v)
