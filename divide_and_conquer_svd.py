@@ -126,7 +126,7 @@ def _divide_and_conquer_svd_bidiagonal(
         return v.T, s, u.T
 
     if n == 0:
-        return np.zeros((0, 0)), np.zeros((0, 0)), np.zeros((0, 0))
+        return np.zeros((m, m)), np.zeros((m, n)), np.zeros((n, n))
 
     if n == 1:
         return np.eye(m), B, np.eye(n)
@@ -361,6 +361,8 @@ def _find_eigenvectors_of_d_z_matrix(
     eigenvectors = []
     for eigenvalue in eigenvalues:
         eigenvector = _find_kth_eigenvector_of_d_z_matrix(d, z, eigenvalue, tol)
+        if (v_e_norm := np.linalg.norm(eigenvector)) > tol:
+            eigenvector /= v_e_norm
         eigenvectors.append(eigenvector)
     return eigenvectors
 
