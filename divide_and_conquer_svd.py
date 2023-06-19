@@ -107,10 +107,10 @@ def _full_eigen_problem_d_zzt(C_dash: np.ndarray) -> tuple[np.ndarray, np.ndarra
     d = np.array(d)
 
     eigenvalues, eigenvectors = find_eignepairs_of_d_z_matrix(d, z)
-    Y = np.stack(eigenvectors)
+    YT = np.stack(eigenvectors)
     S = np.diag(eigenvalues)
 
-    return Y.T, S
+    return YT, S
 
 
 def _divide_and_conquer_svd_bidiagonal(
@@ -164,11 +164,11 @@ def _divide_and_conquer_svd_bidiagonal(
         (r_k * f_2T if k + 1 < n else np.array([]))
     ])
 
-    Y, S = _full_eigen_problem_d_zzt(C_dash)
+    YT, S = _full_eigen_problem_d_zzt(C_dash)
 
-    X = C_dash @ Y @ inverse_diagonal(S)
+    X = C_dash.T @ C_dash @ YT.T @ inverse_diagonal(S)
 
-    return U_dash @ P_k @ X, S, Y.T @ P_k.T @ V_dashT
+    return U_dash @ P_k @ X, S, YT @ P_k.T @ V_dashT
 
 
 def _reduce_to_bidiagonal_form(
