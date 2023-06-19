@@ -119,14 +119,27 @@ np.random.seed(42)
 
 A = np.array(
     [
-        [x for x in range(y, y + 6)]
-        for y in range(1, 10)
-    ]
+        [987, 121, 123, -120],
+        [11, 97, 23, 986],
+        [13, 11, 42, 69],
+        [5, 8, 11, 420],
+        [95, 102, -31, 33],
+        [11, 134, 12, 4],
+    ],
+    dtype=float,
 )
+
+# A = np.array(
+#     [
+#         [-9.87159562e+02, 2.03737323e+02, -2.18646041e-15],
+#         [1.21146210e-15, -4.89357256e+02, 9.59710137e+02]
+#     ],
+#     dtype=float,
+# )
 
 print(A)
 
-u, s, v = divide_and_conquer_svd(A, 1e-8)
+u, s, v = divide_and_conquer_svd(A, 1e-10)
 print("A")
 print(A)
 
@@ -141,9 +154,9 @@ print("combined")
 print(u @ s @ v)
 
 Ap = u @ s @ v
-print(A - Ap)
+print('diff', A - Ap, sep="\n")
 print('norm', np.linalg.norm(A - Ap))
 
-eigenvalues = np.linalg.eigvals(A.T @ A)
-print('val', eigenvalues)
-print('s  ', s.T @ s)
+# eigenvalues = np.linalg.eigvals(A.T @ A)
+# print('val', eigenvalues)
+# print('s  ', s.T @ s)

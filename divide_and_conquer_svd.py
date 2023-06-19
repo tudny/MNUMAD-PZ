@@ -39,12 +39,6 @@ def divide_and_conquer_svd(A: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray
     @param tol: Tolerance for singular values
     @return: U, S, V^T such that A = U S V^T (m x m, m x n, n x n)
     """
-    A.dtype = float
-    m, n = A.shape
-    if m < n:
-        u, s, vt = divide_and_conquer_svd(A.T, tol=tol)
-        return vt.T, s.T, u.T
-
     u, s, vt = _divide_and_conquer_svd(A, tol=tol)
     # assert np.allclose(A, u @ s @ vt), "Decomposition is incorrect"
     return u, s, vt
@@ -63,33 +57,36 @@ def _divide_and_conquer_svd(A: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarra
 
     # Step 1: Reduce to bidiagonal form
     u, b, v = _reduce_to_bidiagonal_form(A)
+    assert np.allclose(A, u @ b @ v), "Bidiagonalization is incorrect"
     b = b[:n, :n]  # Remove extra rows and columns with zeros
 
     # Step 2: Compute SVD of bidiagonal matrix
     U, S, V = _divide_and_conquer_svd_bidiagonal(b, tol=tol)
     U = block_diag(U, np.eye(m - n))
-    S = np.block([[S], [np.zeros((m - n, n))]])
+    S = np.block([
+        [S],
+        [np.zeros((m - n, n))]
+    ])
 
     return u @ U, S, V @ v
 
 
-def _row_switching_matrix(i: int, j: int, n: int) -> np.ndarray:
+def _row_moving_matrix(k: int, n: int) -> np.ndarray:
     """
-    Constructs a matrix that switches rows i and j
-    @param i: row index
-    @param j: row index
-    @return: Matrix that switches rows i and j
+    Shifts the k-th row to the top of the matrix
+    Moves the first row to the second position, the second row to the third position, and so on
+    @param k: Row to be moved
+    @param n: Number of rows in the matrix
+    @return: Row moving matrix (n x n)
     """
-    if i == j:
-        return np.eye(n)
-    assert 0 <= i < n, "Row index out of bounds"
-    assert 0 <= j < n, "Row index out of bounds"
+    row_switching_matrix = np.zeros((n, n))
+    for i in range(k):
+        row_switching_matrix[i, i + 1] = 1
+    row_switching_matrix[k, 0] = 1
+    for i in range(k + 1, n):
+        row_switching_matrix[i, i] = 1
 
-    row_switching_matrix = np.eye(n)
-    row_switching_matrix[i, i] = 0
-    row_switching_matrix[j, j] = 0
-    row_switching_matrix[i, j] = 1
-    row_switching_matrix[j, i] = 1
+    print('row_switching_matrix', row_switching_matrix, sep='\n')
 
     return row_switching_matrix
 
@@ -152,11 +149,11 @@ def _divide_and_conquer_svd_bidiagonal(
     U_dash = block_diag(U_1, np.eye(1), U_2)
     V_dashT = block_diag(V_1T, V_2T)
 
-    P_k = _row_switching_matrix(0, k, n)
+    P_k = _row_moving_matrix(k, n)
 
     lambda_1 = V_1T.T[-1, -1].copy()
     l_1T = V_1T.T[-1, :-1].copy()
-    f_2T = V_2T.T[0, 0:].copy() if k + 1 < n else np.zeros((1, 0))
+    f_2T = V_2T.T[0, :].copy() if k + 1 < n else np.zeros((1, 0))
 
     C_dash = block_diag(np.zeros((1, 1)), D_1, D_2)
 
@@ -390,9 +387,15 @@ def find_eignepairs_of_d_z_matrix(
     @param tol: Tolerance for finding eigenvalues and eigenvectors
     @return: Eigenvalues and eigenvectors of D + z^T z
     """
+    d, z = _deflation(d, z, tol)
     eigenvalues = _find_eigenvalue_of_d_z_matrix(d, z, tol)
     eigenvectors = _find_eigenvectors_of_d_z_matrix(d, z, eigenvalues, tol)
     return eigenvalues, eigenvectors
+
+
+def _deflation(d: np.ndarray, z: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, np.ndarray]:
+    obj = list(zip(z, d, list(range(len(d)))))
+    return d, z
 
 
 # ==================================================================================================
