@@ -150,9 +150,9 @@ def _divide_and_conquer_svd_bidiagonal(
 
     P_k = _row_switching_matrix(0, k, n)
 
-    lambda_1 = V_1T[-1, -1].copy()
-    l_1T = V_1T[-1, :-1].copy()
-    f_2T = V_2T[0, 1:].copy() if k + 1 < n else np.zeros((1, 0))
+    lambda_1 = V_1T.T[-1, -1].copy()
+    l_1T = V_1T.T[-1, :-1].copy()
+    f_2T = V_2T.T[0, 0:].copy() if k + 1 < n else np.zeros((1, 0))
 
     C_dash = block_diag(np.eye(1), D_1, D_2)
 
