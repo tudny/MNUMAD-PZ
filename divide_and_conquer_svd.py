@@ -393,8 +393,57 @@ def find_eignepairs_of_d_z_matrix(
     return eigenvalues, eigenvectors
 
 
+# ==================================================================================================
+# ========================================= Deflation ==============================================
+# ==================================================================================================
+
+
+def _find_zeros_in_z(z: np.ndarray) -> list[int]:
+    """
+    Finds the indices of the zeros in z
+    @param z: Parameter vector (N)
+    @return: Indices of the zeros in z
+    """
+    return [i for i, z_i in enumerate(z) if z_i == 0]
+
+
+def _is_zero(a: float) -> bool:
+    return np.count_nonzero(np.array([a])) == 0
+
+
+def _generate_permutation_matrix_from_zeros(z: np.ndarray) -> np.ndarray:
+    """
+    Constructs a permutation matrix that brings zeros in z to the top.
+    @param z: Vector with zeros to bring to the top.
+    @return: Described permutation matrix.
+    """
+    assert len(z.shape) == 1
+    n, = z.shape
+
+    first_free_index = 0
+    p = [-1 for _ in range(len(z))]
+    for idx, z_i in enumerate(z):
+        if _is_zero(z_i):
+            p[idx] = first_free_index
+            first_free_index += 1
+    for idx, z_i in enumerate(z):
+        if not _is_zero(z_i):
+            p[idx] = first_free_index
+            first_free_index += 1
+    P = np.zeros((n, n))
+    for i, j in enumerate(p):
+        P[j, i] = 1
+    return P
+
+
 def _deflation(d: np.ndarray, z: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, np.ndarray]:
     obj = list(zip(z, d, list(range(len(d)))))
+
+    def sort_by_d(obj):
+        return obj[1]
+
+    obj.sort(key=sort_by_d)
+
     return d, z
 
 

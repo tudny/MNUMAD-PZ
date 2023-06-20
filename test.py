@@ -7,7 +7,30 @@ from divide_and_conquer_svd import (
     _find_all_zeros,
     find_eignepairs_of_d_z_matrix,
     _divide_and_conquer_svd_bidiagonal,
+    _deflation,
+    _generate_permutation_matrix_from_zeros,
 )
+
+d = np.array([
+    10, 11, 34, 17, 21, 5, 11, 45
+])
+
+z = np.array([
+    30, 4, 1, 0, 17, 5, 4, 0
+], dtype=float)
+
+# dp, zp = _deflation(d, z)
+# print(dp)
+# print(zp)
+
+P = _generate_permutation_matrix_from_zeros(z)
+print('P')
+print(P)
+
+print('P z')
+print(P @ z)
+
+exit(0)
 
 #
 # A = np.array(
