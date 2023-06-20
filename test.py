@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from PIL import Image
 from divide_and_conquer_svd import (
     divide_and_conquer_svd,
     _householder_from_k,
@@ -11,13 +13,9 @@ from divide_and_conquer_svd import (
     _generate_permutation_matrix_from_zeros,
 )
 
-d = np.array([
-    10, 11, 34, 17, 21, 5, 11, 45
-])
+d = np.array([10, 11, 34, 17, 21, 5, 11, 45])
 
-z = np.array([
-    30, 4, 1, 0, 17, 5, 7, 0
-], dtype=float)
+z = np.array([30, 4, 1, 0, 17, 5, 7, 0], dtype=float)
 
 # dp, zp = _deflation(d, z)
 # print(dp)
@@ -32,10 +30,11 @@ print(eigenvectors)
 for k in range(len(eignevalues)):
     # print('l_i * v_i=', eignevalues[k] * eigenvectors[k])
     # print('A * v_i: =', A @ eigenvectors[k])
-    print('diff', np.linalg.norm(eignevalues[k] * eigenvectors[k] - A @ eigenvectors[k]))
+    print(
+        "diff", np.linalg.norm(eignevalues[k] * eigenvectors[k] - A @ eigenvectors[k])
+    )
 
-
-exit(0)
+# exit(0)
 
 #
 # A = np.array(
@@ -182,9 +181,35 @@ print("combined")
 print(u @ s @ v)
 
 Ap = u @ s @ v
-print('diff', A - Ap, sep="\n")
-print('norm', np.linalg.norm(A - Ap))
+print("diff", A - Ap, sep="\n")
+print("norm", np.linalg.norm(A - Ap))
 
 # eigenvalues = np.linalg.eigvals(A.T @ A)
 # print('val', eigenvalues)
 # print('s  ', s.T @ s)
+
+paris_img = np.array(
+    Image.open("data/paris.jpg").convert("L").resize((500, 500)),
+    dtype=float,
+)
+
+
+def plot_image(A, k):
+    print("Calcualting SVD...")
+    U, S, VT = divide_and_conquer_svd(A, 1e-10)
+    print("Reconstructing image...")
+    combined = U[:, :k] @ S[:k, :k] @ VT[:k, :]
+    diff = np.linalg.norm(A - combined)
+    print(f"Norm of difference: {diff}")
+    print(f"combined {combined}")
+    plt.figure(figsize=(10, 5))
+    plt.subplot(1, 2, 1)
+    plt.imshow(A, cmap="gray")
+    plt.title("Original")
+    plt.subplot(1, 2, 2)
+    plt.imshow(combined, cmap="gray")
+    plt.title("Reconstructed")
+    plt.show()
+
+
+plot_image(paris_img, 20)

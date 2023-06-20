@@ -8,7 +8,7 @@ def sliding_window(collection, window_size):
     if len(collection) < window_size:
         return
     for i in range(len(collection) - window_size + 1):
-        yield collection[i: i + window_size]
+        yield collection[i : i + window_size]
 
 
 def is_square(A: np.ndarray) -> bool:
@@ -30,7 +30,9 @@ def inverse_diagonal(D: np.ndarray) -> np.ndarray:
     return np.diag(1 / np.diag(D))
 
 
-def divide_and_conquer_svd(A: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def divide_and_conquer_svd(
+    A: np.ndarray, tol: float = 1e-6
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Divide and conquer SVD algorithm
     Decomposes a matrix A into U, S, V^T such that A = U S V^T
@@ -44,7 +46,9 @@ def divide_and_conquer_svd(A: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray
     return u, s, vt
 
 
-def _divide_and_conquer_svd(A: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _divide_and_conquer_svd(
+    A: np.ndarray, tol: float = 1e-6
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Divide and conquer SVD algorithm
     @param A: Matrix to be decomposed (m x n)
@@ -63,10 +67,7 @@ def _divide_and_conquer_svd(A: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarra
     # Step 2: Compute SVD of bidiagonal matrix
     U, S, V = _divide_and_conquer_svd_bidiagonal(b, tol=tol)
     U = block_diag(U, np.eye(m - n))
-    S = np.block([
-        [S],
-        [np.zeros((m - n, n))]
-    ])
+    S = np.block([[S], [np.zeros((m - n, n))]])
 
     return u @ U, S, V @ v
 
@@ -86,12 +87,12 @@ def _row_moving_matrix(k: int, n: int) -> np.ndarray:
     for i in range(k + 1, n):
         row_switching_matrix[i, i] = 1
 
-    print('row_switching_matrix', row_switching_matrix, sep='\n')
-
     return row_switching_matrix
 
 
-def _full_eigen_problem_d_zzt(C_dash: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, np.ndarray]:
+def _full_eigen_problem_d_zzt(
+    C_dash: np.ndarray, tol: float = 1e-6
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Computes the eigenvalues and eigenvectors of the matrix D + Z Z^T
     @param C_dash: Matrix D + Z Z^T (n x n)
@@ -102,9 +103,8 @@ def _full_eigen_problem_d_zzt(C_dash: np.ndarray, tol: float = 1e-6) -> tuple[np
     D[0, :] = 0
     d = D.diagonal().copy() ** 2
 
-    print('dd', d)
-
-    eigenvalues, eigenvectors = find_eignepairs_of_d_z_matrix(d, z, tol=tol)
+    eigenvalues, eigenvectors = _deflation(d, z, tol=tol)
+    assert np.all(eigenvectors is not None)
     YT = np.stack(eigenvectors)
     S = np.diag(eigenvalues)
 
@@ -112,8 +112,8 @@ def _full_eigen_problem_d_zzt(C_dash: np.ndarray, tol: float = 1e-6) -> tuple[np
 
 
 def _divide_and_conquer_svd_bidiagonal(
-        B: np.ndarray,
-        tol: float = 1e-6,
+    B: np.ndarray,
+    tol: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Computes the SVD of a bidiagonal matrix
@@ -135,7 +135,7 @@ def _divide_and_conquer_svd_bidiagonal(
     # Decompose B
     k = n // 2
     B_1 = B[:k, : k + 1]
-    B_2 = B[k + 1:, k + 1:]
+    B_2 = B[k + 1 :, k + 1 :]
     q_k = B[k, k]
     r_k = B[k, k + 1] if k + 1 < n else 0
 
@@ -165,9 +165,6 @@ def _divide_and_conquer_svd_bidiagonal(
         ]
     )
 
-    print('C_dash')
-    print(C_dash)
-
     YT, S = _full_eigen_problem_d_zzt(C_dash, tol=tol)
     S = np.sqrt(S)
 
@@ -178,7 +175,7 @@ def _divide_and_conquer_svd_bidiagonal(
 
 
 def _reduce_to_bidiagonal_form(
-        A: np.ndarray,
+    A: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Reduces a matrix A to bidiagonal form using Householder reflections
@@ -212,7 +209,7 @@ def _householder_from_k(x: np.ndarray, k: int) -> np.ndarray:
     @return: Householder matrix H such that H @ x = [*, ..., *, 0, ..., 0]^T where there are k '*'
     """
     upper_left_identity = np.eye(k - 1)
-    lower_right_householder = _householder_from(x[k - 1:])
+    lower_right_householder = _householder_from(x[k - 1 :])
     return block_diag(upper_left_identity, lower_right_householder)
 
 
@@ -267,10 +264,14 @@ class LambdaFunction:
         @return: f(x)
         """
         x = args[0]
-        return 1 + np.sum(self.z ** 2 / (self.d - x))
+        if np.any(np.abs(self.d - x) < 1e-10):
+            raise RuntimeError("Zero in divide")
+        return 1 + np.sum(self.z**2 / (self.d - x))
 
 
-def _find_zero_in(f: LambdaFunction, a: float, b: float, tol: float = 1e-6) -> float:
+def _find_zero_in(
+    f: LambdaFunction, a: float, b: float, tol: float = 1e-6, is_last=False
+) -> float:
     """
     Finds a zero of the function f in the interval [a, b]
     @param f: Function to find zero of
@@ -283,12 +284,10 @@ def _find_zero_in(f: LambdaFunction, a: float, b: float, tol: float = 1e-6) -> f
 
     f_a = -1  # We only care about the sign of f(a)
     c = (a + b) / 2
-    iter = 100
+    max_iteration = 1000
     while abs(f_c := f(c)) > tol:
-        iter -= 1
-        if iter == 0:
-            raise RuntimeError("Maximum number of iterations reached")
-        print(f"Current c: {c}")
+        if (max_iteration := max_iteration - 1) == 0:
+            break
         if f_a * f_c < 0:
             b = c
         else:
@@ -299,19 +298,57 @@ def _find_zero_in(f: LambdaFunction, a: float, b: float, tol: float = 1e-6) -> f
 
 def _find_zero_after(f: LambdaFunction, a: float, tol: float = 1e-6) -> float:
     """
-    Finds a zero of the function f after the point a
-    @param f: Function to find zero of
-    @param a: Point after which to find zero
-    @param tol: Tolerance for finding zero
+    Finds a zero of the function f after the point a.
+    @param f: Function to find zero of.
+    @param a: Point after which to find zero.
+    @param tol: Tolerance for finding zero.
     @return: Zero of f after a
     """
-    value_at_a = -1
-    maybe_b = a + 1
+    maybe_b = a + 10  # _predict_last_zero(f, tol=tol)
     step = 1
-    while f(maybe_b) * value_at_a > 0:
+    while f(maybe_b) <= 0:
         maybe_b += step
         step *= 2
-    return _find_zero_in(f, a, maybe_b, tol)
+    assert a < maybe_b
+    return _find_zero_in(f, a, maybe_b, tol, is_last=True)
+
+
+def _predict_last_zero(f: LambdaFunction, tol: float = 1e-6, model="linear") -> float:
+    """
+    Predicts the last zero of the function f
+    @param f: Function to predict last zero of
+    @param tol: Tolerance for finding zero
+    @return: Predicted last zero of f
+    """
+
+    def constant():
+        return f.d[-1] + 10
+
+    def linear():
+        return f.d[-1] + np.abs(f.z[-1])
+
+    def square():
+        try:
+            d_N = f.d[-1]
+            d_Nm1 = f.d[-2]
+            z_N = f.z[-1]
+            z_Nm1 = f.z[-2]
+            a = 1
+            b = -(d_N + d_Nm1 + z_N + z_Nm1)
+            c = d_N * d_Nm1 + d_N * z_Nm1 + d_Nm1 * z_N
+            if (discriminant := b**2 - 4 * a * c) >= 0:
+                return (-b + np.sqrt(discriminant)) / (2 * a)
+        except:
+            pass
+        return linear()
+
+    models = {
+        "const": constant,
+        "linear": linear,
+        "square": square,
+    }
+
+    return models[model]()
 
 
 def _find_all_zeros(f: LambdaFunction, tol: float = 1e-6) -> np.ndarray:
@@ -323,7 +360,6 @@ def _find_all_zeros(f: LambdaFunction, tol: float = 1e-6) -> np.ndarray:
     @return: Vector of all zeros of f
     """
     zeros = []
-    # print('d', f.d)
     for d_i, d_i1 in sliding_window(f.d, 2):
         zero_i = _find_zero_in(f, d_i, d_i1, tol)
         zeros.append(zero_i)
@@ -332,7 +368,7 @@ def _find_all_zeros(f: LambdaFunction, tol: float = 1e-6) -> np.ndarray:
 
 
 def _find_eigenvalue_of_d_z_matrix(
-        d: np.ndarray, z: np.ndarray, tol: float = 1e-6
+    d: np.ndarray, z: np.ndarray, tol: float = 1e-6
 ) -> np.ndarray:
     """
     Finds the eigenvalues of the matrix D - Z^T Z
@@ -347,7 +383,7 @@ def _find_eigenvalue_of_d_z_matrix(
 
 
 def _find_kth_eigenvector_of_d_z_matrix(
-        d: np.ndarray, z: np.ndarray, kth_eigenvalue: float, tol: float = 1e-6
+    d: np.ndarray, z: np.ndarray, kth_eigenvalue: float, tol: float = 1e-6
 ) -> np.ndarray:
     """
     Finds the kth eigenvector of the matrix D + z^T z
@@ -362,7 +398,7 @@ def _find_kth_eigenvector_of_d_z_matrix(
 
 
 def _find_eigenvectors_of_d_z_matrix(
-        d: np.ndarray, z: np.ndarray, eigenvalues: np.ndarray, tol: float = 1e-6
+    d: np.ndarray, z: np.ndarray, eigenvalues: np.ndarray, tol: float = 1e-6
 ) -> list[np.ndarray]:
     """
     Finds the eigenvectors of the matrix D + z^T z
@@ -382,7 +418,7 @@ def _find_eigenvectors_of_d_z_matrix(
 
 
 def find_eignepairs_of_d_z_matrix(
-        d: np.ndarray, z: np.ndarray, tol: float = 1e-6
+    d: np.ndarray, z: np.ndarray, tol: float = 1e-6
 ) -> tuple[np.ndarray, list[np.ndarray]]:
     """
     Finds the eigenvalues and eigenvectors of the matrix D + z^T z
@@ -411,27 +447,29 @@ def _has_zeros(z: np.ndarray) -> list[int]:
     return np.count_nonzero(np.array([z])) > 0
 
 
-def _is_zero(a: float) -> bool:
-    return np.count_nonzero(np.array([a])) == 0
+def _is_zero(a: float, tol: float = 1e-6) -> bool:
+    return np.abs(a) < 1e-3
 
 
-def _generate_permutation_matrix_from_zeros(z: np.ndarray) -> np.ndarray:
+def _generate_permutation_matrix_from_zeros(
+    z: np.ndarray, tol: float = 1e-6
+) -> np.ndarray:
     """
     Constructs a permutation matrix that brings zeros in z to the top.
     @param z: Vector with zeros to bring to the top.
     @return: Described permutation matrix.
     """
     assert len(z.shape) == 1
-    n, = z.shape
+    (n,) = z.shape
 
     first_free_index = 0
     p = [-1 for _ in range(len(z))]
     for idx, z_i in enumerate(z):
-        if _is_zero(z_i):
+        if _is_zero(z_i, tol=tol):
             p[idx] = first_free_index
             first_free_index += 1
     for idx, z_i in enumerate(z):
-        if not _is_zero(z_i):
+        if not _is_zero(z_i, tol=tol):
             p[idx] = first_free_index
             first_free_index += 1
     P = np.zeros((n, n))
@@ -465,22 +503,10 @@ def extend_top_vector(v: np.ndarray, n: int) -> np.ndarray:
     return np.concatenate((np.zeros(n - len(v)), v))
 
 
-def check_eigenvalues_eigenvectors(d: np.ndarray, z: np.ndarray, eigenvalues: np.ndarray, eigenvecotrs: list[np.ndarray], tol: float = 1e-6):
-    A = np.diag(d) + np.outer(z, z)
-
-    print('=' * 120)
-    for k in range(len(eigenvalues)):
-        # print('l_i * v_i=', eignevalues[k] * eigenvectors[k])
-        # print('A * v_i: =', A @ eigenvectors[k])
-        print('diff', np.linalg.norm(eigenvalues[k] * eigenvecotrs[k] - A @ eigenvecotrs[k]))
-    print('=' * 120)
-
-
-def _deflation(d: np.ndarray, z: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, list[np.ndarray]]:
-    P = _generate_permutation_matrix_from_zeros(z)
-    # print('P')
-    # print(P)
-    # print(z @ z.T)
+def _deflation(
+    d: np.ndarray, z: np.ndarray, tol: float = 1e-6
+) -> tuple[np.ndarray, list[np.ndarray]]:
+    P = _generate_permutation_matrix_from_zeros(z, tol=tol)
 
     part_of_eigenvalues = []
     part_of_eigenvactors = []
@@ -499,31 +525,33 @@ def _deflation(d: np.ndarray, z: np.ndarray, tol: float = 1e-6) -> tuple[np.ndar
             shorter_d.append(dp[idx, idx])
             shorter_z.append(z_i)
 
-    eigenvalues, eigenvectors = _step_2(np.array(shorter_d), np.array(shorter_z), tol=tol)
-    print('_step2')
-    check_eigenvalues_eigenvectors(np.array(shorter_d), np.array(shorter_z), eigenvalues, eigenvectors)
+    eigenvalues, eigenvectors = _step_2(
+        np.array(shorter_d), np.array(shorter_z), tol=tol
+    )
     eigenvectors = [extend_top_vector(v, len(z)) for v in eigenvectors]
     eigenvectors = [P.T @ v for v in eigenvectors]
-    check_eigenvalues_eigenvectors(d, z, np.array(part_of_eigenvalues + list(eigenvalues)), part_of_eigenvactors + eigenvectors)
-    return np.array(part_of_eigenvalues + list(eigenvalues)), part_of_eigenvactors + eigenvectors
+    return (
+        np.array(part_of_eigenvalues + list(eigenvalues)),
+        part_of_eigenvactors + eigenvectors,
+    )
 
 
-def _almost_equal(a: float, b: float, tol=1e-6) -> bool:
+def _almost_equal(a, b, tol=1e-6) -> bool:
     if a is None or b is None:
         return False
     return np.abs(a - b) < tol
 
 
-def _step_2(d: np.ndarray, z: np.ndarray, tol=1e-6) -> tuple[np.ndarray, list[np.ndarray]]:
+def _step_2(
+    d: np.ndarray, z: np.ndarray, tol=1e-6
+) -> tuple[np.ndarray, list[np.ndarray]]:
     d_with_indexes = list(enumerate(d))
     d_with_indexes.sort(key=lambda d_p: d_p[1])
 
-    n, = d.shape
+    (n,) = d.shape
     P = np.zeros((n, n))
-    for (i, (j, _)) in enumerate(d_with_indexes):
+    for i, (j, _) in enumerate(d_with_indexes):
         P[i, j] = 1
-
-    # print(d_with_indexes)
 
     sorted_d = [d[1] for d in d_with_indexes] + [None]
     k = 0
@@ -556,7 +584,7 @@ def _step_2(d: np.ndarray, z: np.ndarray, tol=1e-6) -> tuple[np.ndarray, list[np
     # Run step one again after modification
     z_perm = P @ z
     d_perm = P @ d
-    H_i = _householder_from(z_perm[idx_res:idx_res + k_res + 1], k_res)
+    H_i = _householder_from(z_perm[idx_res : idx_res + k_res + 1], k_res)
     H_m = block_diag(np.eye(idx_res), H_i, np.eye(n - idx_res - k_res - 1))
 
     M_P = np.zeros((n, n))
