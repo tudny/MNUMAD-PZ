@@ -20,14 +20,14 @@ def is_square(A: np.ndarray) -> bool:
     return A.ndim == 2 and A.shape[0] == A.shape[1]
 
 
-def inverse_diagonal(D: np.ndarray) -> np.ndarray:
+def inverse_diagonal(D: np.ndarray, tol: float = 1e-6) -> np.ndarray:
     """
     Computes the inverse of a diagonal matrix
     @param D: Diagonal matrix to be inverted
     @return: Inverse of D
     """
     assert is_square(D), "Matrix D must be square"
-    return np.diag(1 / np.diag(D))
+    return np.diag([1 / d if abs(d) > tol else 0 for d in np.diagonal(D)])
 
 
 def divide_and_conquer_svd(
@@ -41,6 +41,7 @@ def divide_and_conquer_svd(
     @param tol: Tolerance for singular values
     @return: U, S, V^T such that A = U S V^T (m x m, m x n, n x n)
     """
+    assert A.dtype == float or A.dtype == np.float
     u, s, vt = _divide_and_conquer_svd(A, tol=tol)
     # assert np.allclose(A, u @ s @ vt), "Decomposition is incorrect"
     return u, s, vt
@@ -256,6 +257,8 @@ class LambdaFunction:
         assert len(d.shape) == 1, "d must be a vector"
         # Assert z and d have the same length
         assert len(z) == len(d), "z and d must have the same length"
+        assert len(z) > 0
+        assert len(d) > 0
 
     def __call__(self, *args, **kwargs):
         """
@@ -304,7 +307,7 @@ def _find_zero_after(f: LambdaFunction, a: float, tol: float = 1e-6) -> float:
     @param tol: Tolerance for finding zero.
     @return: Zero of f after a
     """
-    maybe_b = a + 10  # _predict_last_zero(f, tol=tol)
+    maybe_b = _predict_last_zero(f, tol=tol)
     step = 1
     while f(maybe_b) <= 0:
         maybe_b += step
@@ -525,9 +528,13 @@ def _deflation(
             shorter_d.append(dp[idx, idx])
             shorter_z.append(z_i)
 
+    if len(shorter_z) == 0:
+        return np.array(part_of_eigenvalues), part_of_eigenvactors
+
     eigenvalues, eigenvectors = _step_2(
         np.array(shorter_d), np.array(shorter_z), tol=tol
     )
+
     eigenvectors = [extend_top_vector(v, len(z)) for v in eigenvectors]
     eigenvectors = [P.T @ v for v in eigenvectors]
     return (

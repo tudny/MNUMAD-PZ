@@ -187,29 +187,35 @@ print("norm", np.linalg.norm(A - Ap))
 # eigenvalues = np.linalg.eigvals(A.T @ A)
 # print('val', eigenvalues)
 # print('s  ', s.T @ s)
-
-paris_img = np.array(
-    Image.open("data/paris.jpg").convert("L").resize((500, 500)),
-    dtype=float,
-)
+from PIL import Image
+import matplotlib.pyplot as plt
 
 
-def plot_image(A, k):
-    print("Calcualting SVD...")
-    U, S, VT = divide_and_conquer_svd(A, 1e-10)
-    print("Reconstructing image...")
-    combined = U[:, :k] @ S[:k, :k] @ VT[:k, :]
-    diff = np.linalg.norm(A - combined)
-    print(f"Norm of difference: {diff}")
-    print(f"combined {combined}")
+def load_image(path_to_image: str, shape: tuple[int, int] = (500, 500)) -> np.ndarray:
+    return np.array(
+        Image.open(path_to_image).convert("L").resize(shape),
+        dtype=float,
+    )
+
+
+def compress_image(path_to_image: str, k: int = 50, tol: float = 1e-10, shape: tuple[int, int] = (500, 500)):
+    image_matrix = load_image(path_to_image, shape=shape)
+    U, S, VT = divide_and_conquer_svd(image_matrix, tol)
+
+    U_k = U[:, :k]
+    S_k = S[:k, :k]
+    VT_k = VT[:k, :]
+
+    compressed = U_k @ S_k @ VT_k
     plt.figure(figsize=(10, 5))
     plt.subplot(1, 2, 1)
-    plt.imshow(A, cmap="gray")
+    plt.imshow(image_matrix, cmap="gray")
     plt.title("Original")
     plt.subplot(1, 2, 2)
-    plt.imshow(combined, cmap="gray")
-    plt.title("Reconstructed")
+    plt.imshow(compressed, cmap="gray")
+    plt.title(f"Reconstructed {k=}")
     plt.show()
 
 
-plot_image(paris_img, 20)
+# %%
+compress_image('mimlogo.jpg')
