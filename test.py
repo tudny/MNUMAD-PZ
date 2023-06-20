@@ -16,19 +16,24 @@ d = np.array([
 ])
 
 z = np.array([
-    30, 4, 1, 0, 17, 5, 4, 0
+    30, 4, 1, 0, 17, 5, 7, 0
 ], dtype=float)
 
 # dp, zp = _deflation(d, z)
 # print(dp)
 # print(zp)
 
-P = _generate_permutation_matrix_from_zeros(z)
-print('P')
-print(P)
+A = np.diag(d) + np.outer(z, z)
 
-print('P z')
-print(P @ z)
+eignevalues, eigenvectors = _deflation(d, z)
+print(eignevalues)
+print(eigenvectors)
+
+for k in range(len(eignevalues)):
+    # print('l_i * v_i=', eignevalues[k] * eigenvectors[k])
+    # print('A * v_i: =', A @ eigenvectors[k])
+    print('diff', np.linalg.norm(eignevalues[k] * eigenvectors[k] - A @ eigenvectors[k]))
+
 
 exit(0)
 

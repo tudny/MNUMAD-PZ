@@ -216,7 +216,7 @@ def _householder_from_k(x: np.ndarray, k: int) -> np.ndarray:
     return block_diag(upper_left_identity, lower_right_householder)
 
 
-def _householder_from(x: np.ndarray) -> np.ndarray:
+def _householder_from(x: np.ndarray, k: int = 0) -> np.ndarray:
     """
     Constructs a Householder matrix such that multiplied by the vector `v` it will
     produce a vector with at most on non-zero element (at the top of the vector).
@@ -229,7 +229,7 @@ def _householder_from(x: np.ndarray) -> np.ndarray:
         return np.eye(n)
     v = x.copy()
     v_norm = np.linalg.norm(v)
-    v[0] += np.sign(v[0]) * v_norm
+    v[k] += np.sign(v[k]) * v_norm
     v_norm = np.linalg.norm(v)
     if n == 0 or not np.nonzero(v_norm):
         return np.eye(n)
@@ -283,7 +283,11 @@ def _find_zero_in(f: LambdaFunction, a: float, b: float, tol: float = 1e-6) -> f
 
     f_a = -1  # We only care about the sign of f(a)
     c = (a + b) / 2
+    iter = 100
     while abs(f_c := f(c)) > tol:
+        iter -= 1
+        if iter == 0:
+            raise RuntimeError("Maximum number of iterations reached")
         print(f"Current c: {c}")
         if f_a * f_c < 0:
             b = c
@@ -319,7 +323,7 @@ def _find_all_zeros(f: LambdaFunction, tol: float = 1e-6) -> np.ndarray:
     @return: Vector of all zeros of f
     """
     zeros = []
-    print('d', f.d)
+    # print('d', f.d)
     for d_i, d_i1 in sliding_window(f.d, 2):
         zero_i = _find_zero_in(f, d_i, d_i1, tol)
         zeros.append(zero_i)
@@ -387,7 +391,7 @@ def find_eignepairs_of_d_z_matrix(
     @param tol: Tolerance for finding eigenvalues and eigenvectors
     @return: Eigenvalues and eigenvectors of D + z^T z
     """
-    d, z = _deflation(d, z, tol)
+    # d, z = _deflation(d, z, tol)
     eigenvalues = _find_eigenvalue_of_d_z_matrix(d, z, tol)
     eigenvectors = _find_eigenvectors_of_d_z_matrix(d, z, eigenvalues, tol)
     return eigenvalues, eigenvectors
@@ -398,13 +402,13 @@ def find_eignepairs_of_d_z_matrix(
 # ==================================================================================================
 
 
-def _find_zeros_in_z(z: np.ndarray) -> list[int]:
+def _has_zeros(z: np.ndarray) -> list[int]:
     """
     Finds the indices of the zeros in z
     @param z: Parameter vector (N)
     @return: Indices of the zeros in z
     """
-    return [i for i, z_i in enumerate(z) if z_i == 0]
+    return np.count_nonzero(np.array([z])) > 0
 
 
 def _is_zero(a: float) -> bool:
@@ -436,15 +440,140 @@ def _generate_permutation_matrix_from_zeros(z: np.ndarray) -> np.ndarray:
     return P
 
 
-def _deflation(d: np.ndarray, z: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, np.ndarray]:
-    obj = list(zip(z, d, list(range(len(d)))))
+def e_i(i: int, n: int) -> np.ndarray:
+    """
+    Constructs the i-th unit vector of dimension n.
+    @param i: Index of the unit vector.
+    @param n: Dimension of the unit vector.
+    @return: i-th unit vector of dimension n.
+    """
+    assert 0 <= i < n
+    e = np.zeros(n)
+    e[i] = 1
+    return e
 
-    def sort_by_d(obj):
-        return obj[1]
 
-    obj.sort(key=sort_by_d)
+def extend_top_vector(v: np.ndarray, n: int) -> np.ndarray:
+    """
+    Extends the vector v to dimension n by adding zeros to the top.
+    @param v: Vector to be extended.
+    @param n: Dimension of the extended vector.
+    @return: Extended vector.
+    """
+    assert len(v.shape) == 1
+    assert len(v) <= n
+    return np.concatenate((np.zeros(n - len(v)), v))
 
-    return d, z
+
+def check_eigenvalues_eigenvectors(d: np.ndarray, z: np.ndarray, eigenvalues: np.ndarray, eigenvecotrs: list[np.ndarray], tol: float = 1e-6):
+    A = np.diag(d) + np.outer(z, z)
+
+    print('=' * 120)
+    for k in range(len(eigenvalues)):
+        # print('l_i * v_i=', eignevalues[k] * eigenvectors[k])
+        # print('A * v_i: =', A @ eigenvectors[k])
+        print('diff', np.linalg.norm(eigenvalues[k] * eigenvecotrs[k] - A @ eigenvecotrs[k]))
+    print('=' * 120)
+
+
+def _deflation(d: np.ndarray, z: np.ndarray, tol: float = 1e-6) -> tuple[np.ndarray, list[np.ndarray]]:
+    P = _generate_permutation_matrix_from_zeros(z)
+    # print('P')
+    # print(P)
+    # print(z @ z.T)
+
+    part_of_eigenvalues = []
+    part_of_eigenvactors = []
+
+    dp = P @ np.diag(d) @ P.T
+    zp = P @ z
+
+    shorter_d = []
+    shorter_z = []
+
+    for idx, z_i in enumerate(zp):
+        if _is_zero(z_i):
+            part_of_eigenvalues.append(dp[idx, idx])
+            part_of_eigenvactors.append(P.T @ e_i(idx, len(zp)))
+        else:
+            shorter_d.append(dp[idx, idx])
+            shorter_z.append(z_i)
+
+    eigenvalues, eigenvectors = _step_2(np.array(shorter_d), np.array(shorter_z), tol=tol)
+    print('_step2')
+    check_eigenvalues_eigenvectors(np.array(shorter_d), np.array(shorter_z), eigenvalues, eigenvectors)
+    eigenvectors = [extend_top_vector(v, len(z)) for v in eigenvectors]
+    eigenvectors = [P.T @ v for v in eigenvectors]
+    check_eigenvalues_eigenvectors(d, z, np.array(part_of_eigenvalues + list(eigenvalues)), part_of_eigenvactors + eigenvectors)
+    return np.array(part_of_eigenvalues + list(eigenvalues)), part_of_eigenvactors + eigenvectors
+
+
+def _almost_equal(a: float, b: float, tol=1e-6) -> bool:
+    if a is None or b is None:
+        return False
+    return np.abs(a - b) < tol
+
+
+def _step_2(d: np.ndarray, z: np.ndarray, tol=1e-6) -> tuple[np.ndarray, list[np.ndarray]]:
+    d_with_indexes = list(enumerate(d))
+    d_with_indexes.sort(key=lambda d_p: d_p[1])
+
+    n, = d.shape
+    P = np.zeros((n, n))
+    for (i, (j, _)) in enumerate(d_with_indexes):
+        P[i, j] = 1
+
+    # print(d_with_indexes)
+
+    sorted_d = [d[1] for d in d_with_indexes] + [None]
+    k = 0
+    idx = 0
+    res = []
+    while sorted_d[idx] is not None:
+        if _almost_equal(sorted_d[idx], sorted_d[idx + k], tol=tol):
+            k += 1
+        else:
+            res.append((idx, k - 1))
+            idx += k
+            k = 0
+
+    k_res = -1  # d_i
+    idx_res = -1  # d_{i+k}
+    for idx, k in res:
+        if k > 0:
+            idx_res, k_res = idx, k
+            break
+
+    sorted_d = sorted_d[:-1]
+
+    if k_res == -1:
+        new_d = np.array(sorted_d)
+        new_z = P @ z
+        eigenvalues, eigenvactors = find_eignepairs_of_d_z_matrix(new_d, new_z, tol=tol)
+        new_eigenvactors = [P.T @ v for v in eigenvactors]
+        return eigenvalues, new_eigenvactors
+
+    # Run step one again after modification
+    z_perm = P @ z
+    d_perm = P @ d
+    H_i = _householder_from(z_perm[idx_res:idx_res + k_res + 1], k_res)
+    H_m = block_diag(np.eye(idx_res), H_i, np.eye(n - idx_res - k_res - 1))
+
+    M_P = np.zeros((n, n))
+    iterator = 0
+    a = idx_res
+    b = idx_res + k_res
+    for i in list(range(a, b + 1)) + list(range(0, a)) + list(range(b + 1, n)):
+        M_P[i, iterator] = 1
+        iterator += 1
+
+    H = M_P @ H_m
+
+    new_d = np.diagonal(H @ np.diag(d_perm) @ H.T)
+    new_z = H @ z_perm
+    eigenvalues, eigenvactors = _deflation(new_d, new_z, tol=tol)
+    new_eigenvactors = [P.T @ H.T @ v for v in eigenvactors]
+    return eigenvalues, new_eigenvactors
 
 
 # ==================================================================================================
